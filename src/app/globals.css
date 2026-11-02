@@ -1,0 +1,349 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * Night desk. Earth at night is the stage; the interface is a broadcast desk laid over it.
+ * Colour lives in the data (status), never in decoration. Surfaces are solid, not glass.
+ */
+@theme inline {
+  --font-sans: var(--font-mona);
+  --font-display: var(--font-hubot);
+  --font-mono: var(--font-martian);
+  --font-mono--font-variation-settings: "wdth" 87.5;
+  --font-heading: var(--font-hubot);
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+
+  --color-space: #050505;
+  --color-surface: #111111;
+  --color-surface-2: #191919;
+  --color-surface-3: #242424;
+  --color-hairline: #303030;
+  --color-hairline-2: #454545;
+  --color-ink: #f2f2f2;
+  --color-ink-2: #c7c7c7;
+  --color-ink-3: #a3a3a3;
+  --color-ink-4: #8c8c8c;
+  --color-confirmed: #ff4a3d;
+  --color-reported: #ffb547;
+  --color-claimed: #dedede;
+  --color-outage: #5ec8ff;
+  --color-safe: #6ee7a8;
+
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 10px;
+  --radius-xl: 14px;
+  --radius-2xl: 18px;
+  --radius-3xl: 22px;
+  --radius-4xl: 28px;
+
+  --ease-out-expo: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-out-quint: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+:root {
+  --radius: 10px;
+  --background: var(--color-space);
+  --foreground: var(--color-ink);
+  --card: var(--color-surface);
+  --card-foreground: var(--color-ink);
+  --popover: var(--color-surface);
+  --popover-foreground: var(--color-ink);
+  --primary: var(--color-ink);
+  --primary-foreground: var(--color-space);
+  --secondary: var(--color-surface-2);
+  --secondary-foreground: var(--color-ink);
+  --muted: var(--color-surface-2);
+  --muted-foreground: var(--color-ink-3);
+  --accent: var(--color-surface-3);
+  --accent-foreground: var(--color-ink);
+  --destructive: #ff4a3d;
+  --border: var(--color-hairline);
+  --input: #666666;
+  --ring: var(--color-ink);
+  color-scheme: dark;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/40;
+  }
+  html {
+    @apply font-sans;
+    background: var(--color-space);
+    font-variation-settings: "wdth" 100;
+  }
+  body {
+    @apply bg-background text-foreground;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+  ::selection {
+    background: #454545;
+    color: #fff;
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-ink);
+    outline-offset: 2px;
+  }
+  input::placeholder,
+  textarea::placeholder {
+    color: var(--color-ink-4);
+  }
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+}
+
+@utility tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Hubot Sans, condensed: hero numbers, names and titles. */
+@utility font-condensed {
+  font-family: var(--font-hubot);
+  font-variation-settings: "wdth" 75;
+}
+
+@utility font-semicondensed {
+  font-family: var(--font-hubot);
+  font-variation-settings: "wdth" 87.5;
+}
+
+@utility scrollbar-none {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@utility scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: #555555 transparent;
+}
+
+@utility elevated {
+  box-shadow: 0 12px 32px rgb(0 0 0 / 0.35);
+}
+
+/* Keep the shared class names, with solid surfaces that stay readable over the map. */
+.glass-panel,
+.drawer-surface {
+  background: var(--color-surface);
+  box-shadow:
+    inset 0 0 0 1px var(--color-hairline),
+    0 12px 32px rgb(0 0 0 / 0.35);
+}
+
+.drawer-surface {
+  animation-timing-function: var(--ease-drawer) !important;
+}
+
+/* Tactile press feedback for pills and buttons. */
+@utility press {
+  transition-property: transform, background-color, color, box-shadow;
+  transition-duration: 160ms;
+  transition-timing-function: var(--ease-out-expo);
+  &:active {
+    transform: scale(0.97);
+  }
+}
+
+@media (hover: hover) {
+  .lift:hover {
+    background-color: rgb(255 255 255 / 0.06);
+  }
+}
+
+.glass-pill {
+  background: var(--color-surface);
+  box-shadow: inset 0 0 0 1px var(--color-hairline);
+}
+
+@keyframes live-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgb(255 74 61 / 0.55);
+  }
+  70% {
+    box-shadow: 0 0 0 7px rgb(255 74 61 / 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgb(255 74 61 / 0);
+  }
+}
+
+.live-dot {
+  animation: live-pulse 2s var(--ease-out-quint) infinite;
+}
+
+@keyframes caret {
+  50% {
+    opacity: 0;
+  }
+}
+
+.caret::after {
+  content: "";
+  display: inline-block;
+  width: 1px;
+  height: 1em;
+  margin-left: 2px;
+  vertical-align: -0.12em;
+  background: currentColor;
+  animation: caret 0.9s steps(1) infinite;
+}
+
+@keyframes shimmer {
+  from {
+    background-position: -200% 0;
+  }
+  to {
+    background-position: 200% 0;
+  }
+}
+
+.skeleton {
+  background: linear-gradient(90deg, #242424 0%, #333333 50%, #242424 100%);
+  background-size: 200% 100%;
+  animation: shimmer 1.6s linear infinite;
+}
+
+/* The bottom edge belongs to the panels; the wordmark and credits sit top-left, clear of every panel. */
+.mapboxgl-map .mapboxgl-ctrl-top-left {
+  /* Below the site bar and the ticker row it wraps to on phones (104px together). */
+  top: 112px;
+  display: flex;
+  align-items: center;
+}
+
+@media (min-width: 768px) {
+  .mapboxgl-map .mapboxgl-ctrl-top-left {
+    top: 66px;
+    left: 444px;
+  }
+}
+
+.mapboxgl-ctrl-logo {
+  opacity: 0.4;
+}
+
+.mapboxgl-map .mapboxgl-ctrl-attrib.mapboxgl-compact {
+  transform: scale(0.78);
+  transform-origin: left center;
+}
+
+.mapboxgl-ctrl-attrib {
+  opacity: 0.6;
+}
+
+.mapboxgl-ctrl-attrib.mapboxgl-compact {
+  background: var(--color-surface) !important;
+  color: var(--color-ink-3) !important;
+}
+
+.mapboxgl-ctrl-attrib a {
+  color: var(--color-ink-3) !important;
+}
+
+.prose-report h1,
+.prose-report h2,
+.prose-report h3 {
+  margin: 1em 0 0.3em;
+  font-size: 13px;
+  font-weight: 650;
+  letter-spacing: 0;
+  color: var(--color-ink);
+}
+.prose-report h1:first-child,
+.prose-report h2:first-child,
+.prose-report h3:first-child {
+  margin-top: 0;
+}
+.prose-report p {
+  margin: 0.4em 0;
+}
+.prose-report ul,
+.prose-report ol {
+  margin: 0.4em 0;
+  padding-left: 1.15em;
+  list-style: disc;
+}
+.prose-report li {
+  margin: 0.25em 0;
+}
+.prose-report li::marker {
+  color: var(--color-ink-4);
+}
+.prose-report a {
+  color: var(--color-ink);
+  text-decoration: underline;
+  text-decoration-color: var(--color-ink-4);
+  text-underline-offset: 3px;
+}
+.prose-report strong {
+  color: #fff;
+  font-weight: 650;
+}
+.prose-report code {
+  font-family: var(--font-martian);
+  font-size: 0.9em;
+  color: #fff;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .live-dot,
+  .caret::after,
+  .skeleton {
+    animation: none;
+  }
+}
+
+/* The new-CVE ticker: two copies of the list slide left by one copy's width, so the loop is seamless. */
+@keyframes ticker {
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.ticker-track {
+  animation: ticker var(--ticker-duration, 60s) linear infinite;
+}
+
+.ticker:hover .ticker-track,
+.ticker:focus-within .ticker-track {
+  animation-play-state: paused;
+}
+
+.ticker-mask {
+  mask-image: linear-gradient(90deg, transparent 0, #000 28px, #000 calc(100% - 40px), transparent 100%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ticker-track {
+    animation: none;
+  }
+}

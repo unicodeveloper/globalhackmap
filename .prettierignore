@@ -1,0 +1,6 @@
+.next
+node_modules
+pnpm-lock.yaml
+src/data
+src/lib/og/metrics.ts
+public
