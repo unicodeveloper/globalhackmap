@@ -3,6 +3,8 @@ import "server-only";
 import { cacheLife } from "next/cache";
 
 import { callAsUser } from "@/lib/auth/server";
+import { type Fetched, settle, unwrap } from "@/lib/fetched";
+import { reserveSharedWork } from "@/lib/http/paid-budget";
 import { valyuServer } from "@/lib/valyu/server";
 
 export interface BriefResult {
@@ -62,13 +64,24 @@ function body(question: string, startDate?: string) {
 
 /**
  * Answer with the deployment's key, shared by every instance for 6 hours so popular incidents cost once.
- * Every argument is part of the cache key; failures throw and are not cached.
+ * Every argument is part of the cache key; failures settle with a short retry lifetime.
  */
 export async function answerShared(key: string, question: string, startDate?: string): Promise<BriefResult> {
+  return unwrap(await answerSharedFetched(key, question, startDate));
+}
+
+async function answerSharedFetched(key: string, question: string, startDate?: string): Promise<Fetched<BriefResult>> {
   "use cache: remote";
-  cacheLife("answer");
+  const result = await settle(() => requestAnswer(question, startDate));
+  if (result.ok) cacheLife("answer");
+  else cacheLife("minutes");
+  return result;
+}
+
+async function requestAnswer(question: string, startDate?: string): Promise<BriefResult> {
   const valyu = valyuServer();
   if (!valyu) throw new Error("This deployment has no Valyu API key.");
+  await reserveSharedWork("answer");
   const res = await valyu.answer(question, {
     systemInstructions: SYSTEM,
     searchType: "all",

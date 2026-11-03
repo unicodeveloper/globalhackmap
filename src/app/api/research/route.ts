@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { ValyuProxyError, callAsUser, getAccessToken } from "@/lib/auth/server";
 import { countryName } from "@/lib/geo";
-import { allow, clientIp } from "@/lib/http/rate-limit";
+import { reserveSharedWork } from "@/lib/http/paid-budget";
 import { findIncident, findVuln } from "@/lib/lookup";
 import { ACCOUNTS } from "@/lib/mode";
 import { valyuServer } from "@/lib/valyu/server";
@@ -16,15 +16,13 @@ interface CreateResponse {
 }
 
 /** Self-hosted: research runs on the deployment's own key, capped per visitor and overall. */
-async function startOnDeploymentKey(request: Request, query: string, metadata: Record<string, string>) {
+async function startOnDeploymentKey(query: string, metadata: Record<string, string>) {
   const valyu = valyuServer();
   if (!valyu) return NextResponse.json({ error: "This deployment has no Valyu API key." }, { status: 503 });
-  if (!allow(`research:${clientIp(request)}`, 3, 3_600_000) || !allow("research:all", 30, 3_600_000)) {
-    return NextResponse.json({ error: "Research is busy right now. Try again in an hour." }, { status: 429 });
-  }
+  await reserveSharedWork("research");
   const task = await valyu.deepresearch.create({ query, mode: "fast", outputFormats: ["markdown", "pdf"], metadata });
   if (!task.success || !task.deepresearch_id) {
-    console.error("[research]", task.error);
+    console.error("[research] Upstream task rejected");
     return NextResponse.json({ error: "Research could not start just now. Try again in a minute." }, { status: 502 });
   }
   return NextResponse.json({ taskId: task.deepresearch_id, status: task.status ?? "queued" });
@@ -72,14 +70,14 @@ Cover affected and fixed versions per product line, whether it is exploited in t
   const metadata = { app: "globalhackmap", kind: kind ?? "", id: kind === "stack" ? "stack" : (id ?? "") };
 
   try {
-    if (!token) return await startOnDeploymentKey(request, query, metadata);
+    if (!token) return await startOnDeploymentKey(query, metadata);
     const task = await callAsUser<CreateResponse>(token, "/v1/deepresearch/tasks", {
       query,
       mode: "fast",
       output_formats: ["markdown", "pdf"],
       metadata,
     });
-    if (!task.deepresearch_id) return NextResponse.json({ error: task.error ?? "Could not start research." }, { status: 502 });
+    if (!task.deepresearch_id) return NextResponse.json({ error: "Could not start research. Please try again shortly." }, { status: 502 });
     return NextResponse.json({ taskId: task.deepresearch_id, status: task.status ?? "queued" });
   } catch (error) {
     if (error instanceof ValyuProxyError && error.status === 402) {
@@ -88,7 +86,7 @@ Cover affected and fixed versions per product line, whether it is exploited in t
     if (error instanceof ValyuProxyError && error.status === 401) {
       return NextResponse.json({ error: "Your Valyu session expired. Sign in again.", needsAuth: true }, { status: 401 });
     }
-    console.error("[research]", error instanceof Error ? error.message : error);
+    console.error("[research] Request failed");
     return NextResponse.json({ error: "Research could not start just now. Try again in a minute." }, { status: 502 });
   }
 }

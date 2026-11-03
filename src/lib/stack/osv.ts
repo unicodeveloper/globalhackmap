@@ -132,7 +132,7 @@ export async function getOsvRecord(id: string): Promise<OsvRecord | null> {
 }
 
 async function getOsvRecordFetched(id: string): Promise<Fetched<OsvRecord | null>> {
-  "use cache";
+  "use cache: remote";
   const result = await settle(async () => {
     const res = await fetch(`${OSV}/vulns/${encodeURIComponent(id)}`, {
       headers: { "User-Agent": UA },

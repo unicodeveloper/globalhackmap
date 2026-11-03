@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { answerAsUser, answerShared } from "@/lib/ai/answer";
 import { takeFreeBrief } from "@/lib/ai/quota";
 import { ValyuProxyError, getAccessToken } from "@/lib/auth/server";
-import { allow, clientIp } from "@/lib/http/rate-limit";
+import { clientIp, limitResponse, takeLimits } from "@/lib/http/rate-limit";
 import { findIncident, findVuln } from "@/lib/lookup";
 import { countryName } from "@/lib/geo";
 import { ACCOUNTS } from "@/lib/mode";
@@ -39,14 +39,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ ...result, mode: "user" });
     }
     // The cookie is a courtesy limit (clearing it resets it); these caps bound what scripts can spend.
-    if (!allow(`ip:${clientIp(request)}`, 12, 3_600_000) || !allow("free:all", 400, 3_600_000)) {
-      return NextResponse.json(
-        ACCOUNTS
-          ? { error: "Free AI briefs are busy right now. Sign in with Valyu to keep going on your own free credits.", needsAuth: true }
-          : { error: "AI briefs are busy right now. Try again in a few minutes." },
-        { status: 429 },
-      );
-    }
+    const limited = limitResponse(await takeLimits([{ key: `free-brief:${clientIp(request)}`, limit: 12, windowMs: 3_600_000 }]));
+    if (limited) return limited;
     // Self-hosted deployments have no accounts to send people to, so only the caps above apply.
     const quota = ACCOUNTS ? await takeFreeBrief() : null;
     if (quota && !quota.allowed) {
@@ -71,8 +65,8 @@ export async function POST(request: Request) {
     if (error instanceof ValyuProxyError && error.status === 401) {
       return NextResponse.json({ error: "Your Valyu session expired. Sign in again.", needsAuth: true }, { status: 401 });
     }
-    // Upstream messages can carry request details; log them here and keep the response generic.
-    console.error("[brief]", error instanceof Error ? error.message : error);
+    // Upstream messages can carry request details or credentials; keep diagnostics generic too.
+    console.error("[brief] Request failed");
     return NextResponse.json({ error: "The brief could not be written just now. Try again in a minute." }, { status: 502 });
   }
 }

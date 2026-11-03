@@ -74,13 +74,13 @@ export function MapSidebar({
         aria-label="Live incident sidebar"
         className={cn(
           "absolute inset-x-0 bottom-0 z-20 flex flex-col rounded-t-[24px] transition-[height] duration-300 ease-out-expo motion-reduce:transition-none",
-          sheetOpen ? "h-[88dvh]" : "h-[52dvh]",
-          "md:inset-x-auto md:bottom-4 md:left-4 md:top-[76px] md:h-auto md:w-[var(--sidebar-width)] md:rounded-[22px]",
+          sheetOpen ? "h-[min(88dvh,calc(100dvh-var(--map-top)))]" : "h-[52dvh]",
+          "md:inset-x-auto md:bottom-4 md:left-4 md:top-[var(--map-top)] md:h-auto md:w-[var(--sidebar-width)] md:rounded-[22px]",
           !open && "hidden",
         )}
         style={{ "--sidebar-width": `${width}px`, pointerEvents: cinema ? "none" : undefined } as CSSProperties}
       >
-        <div className="glass-panel flex h-full min-h-0 flex-col overflow-hidden rounded-t-[24px] pt-2 md:rounded-[22px] md:pt-0">
+        <div className="glass-panel flex h-full min-h-0 flex-col overflow-hidden rounded-t-[24px] pb-[env(safe-area-inset-bottom)] pt-2 md:rounded-[22px] md:pb-0 md:pt-0">
           <button
             type="button"
             onClick={onSheetToggle}

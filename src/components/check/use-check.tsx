@@ -148,7 +148,7 @@ function Picker({ suggestions, incidents }: { suggestions: Suggestion[]; inciden
   };
 
   return (
-    <div className={cn(TILE, TILE_FOCUS)}>
+    <div className={cn(TILE, TILE_FOCUS, "min-w-0")}>
       <form
         className="relative flex items-center gap-3 px-4 py-3.5 sm:px-5"
         onSubmit={(event) => {
@@ -173,7 +173,7 @@ function Picker({ suggestions, incidents }: { suggestions: Suggestion[]; inciden
         <button
           type="submit"
           disabled={query.length < 2}
-          className="press flex h-8 items-center gap-1.5 rounded-full bg-ink px-3 text-[13px] font-medium text-space hover:bg-white disabled:bg-white/[0.06] disabled:text-ink-4"
+          className="press flex h-8 shrink-0 items-center gap-1.5 rounded-full bg-ink px-3 text-[13px] font-medium text-space hover:bg-white disabled:bg-white/[0.06] disabled:text-ink-4"
         >
           <Plus className="size-3.5" weight="bold" /> Add
         </button>
@@ -202,10 +202,10 @@ function Picker({ suggestions, incidents }: { suggestions: Suggestion[]; inciden
         <>
           <div className={cn("flex flex-wrap items-center gap-1.5 border-t px-4 py-3 sm:px-5", DIVIDER)}>
             {items.map((item) => (
-              <span key={item} className="flex h-8 items-center gap-2 rounded-full bg-ink pl-1.5 pr-1 text-[13px] font-medium text-space">
+              <span key={item} className="flex h-8 max-w-full items-center gap-2 rounded-full bg-ink pl-1.5 pr-1 text-[13px] font-medium text-space">
                 <OrgLogo name={item} domain={domainOf(item, suggestions)} size={20} className="rounded-full" />
-                {item}
-                <button type="button" onClick={() => remove(item)} className="rounded-full p-1 hover:bg-black/10" aria-label={`Remove ${item}`}>
+                <span className="min-w-0 truncate">{item}</span>
+                <button type="button" onClick={() => remove(item)} className="shrink-0 rounded-full p-1 hover:bg-black/10" aria-label={`Remove ${item}`}>
                   <X className="size-3" weight="bold" />
                 </button>
               </span>
@@ -408,6 +408,7 @@ export function UseCheck({
         setReport(json);
       } catch (err) {
         if (controller.signal.aborted) return;
+        setReport(null);
         setError(err instanceof Error ? err.message : CHECK_FAILED);
       } finally {
         if (!controller.signal.aborted) setLoading(false);
@@ -425,7 +426,7 @@ export function UseCheck({
   }, [items, report, incidents, suggestions, now]);
 
   return (
-    <div className="grid gap-4">
+    <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-4">
       <Picker suggestions={suggestions} incidents={incidents} />
 
       {items.length ? (
