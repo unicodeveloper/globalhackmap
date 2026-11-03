@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { checkStack } from "@/lib/stack/check";
 import { MAX_INPUT_BYTES } from "@/lib/stack/types";
+import { readBoundedBody } from "@/lib/http/body";
 
 export const maxDuration = 60;
 
@@ -15,11 +16,9 @@ const Body = z.object({
 
 /** Stack check. The submitted text is parsed in memory and never logged or stored. */
 export async function POST(request: Request) {
-  const declared = Number(request.headers.get("content-length") ?? 0);
-  if (declared > MAX_INPUT_BYTES + 4_096) return NextResponse.json({ error: TOO_LARGE }, { status: 413 });
-
-  const raw = await request.text().catch(() => "");
-  if (raw.length > MAX_INPUT_BYTES + 4_096) return NextResponse.json({ error: TOO_LARGE }, { status: 413 });
+  const bytes = await readBoundedBody(request, MAX_INPUT_BYTES + 4_096).catch(() => null);
+  if (!bytes) return NextResponse.json({ error: TOO_LARGE }, { status: 413 });
+  const raw = new TextDecoder().decode(bytes);
 
   let json: unknown;
   try {

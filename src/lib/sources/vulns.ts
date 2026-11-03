@@ -1,4 +1,6 @@
 import "server-only";
+import { reserveSharedWork } from "@/lib/http/paid-budget";
+import { takeLimits } from "@/lib/http/rate-limit";
 
 import { type Fetched, settle, unwrap } from "@/lib/fetched";
 
@@ -9,6 +11,13 @@ import { withLastGood } from "@/lib/sources/last-good";
 import { valyuServer } from "@/lib/valyu/server";
 
 const UA = "GlobalHackMap/1.0 (+https://github.com/yorkeccak/globalhackmap)";
+
+async function nvdFetch(url: string | URL): Promise<Response> {
+  const key = process.env.NVD_API_KEY;
+  const quota = await takeLimits([{ key: "upstream:nvd", limit: key ? 45 : 4, windowMs: 30_000 }]);
+  if (!quota.allowed) throw new Error("NVD request budget unavailable");
+  return fetch(url, { headers: { "User-Agent": UA, ...(key ? { apiKey: key } : {}) }, signal: AbortSignal.timeout(25_000) });
+}
 
 interface KevEntry {
   cveID: string;
@@ -48,7 +57,7 @@ export async function getKevCatalog(): Promise<Vuln[]> {
 }
 
 async function getKevCatalogFetched(): Promise<Fetched<Vuln[]>> {
-  "use cache";
+  "use cache: remote";
   const result = await settle(async () => {
     return withLastGood("kev", async () => {
       const res = await fetch("https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json", {
@@ -141,7 +150,7 @@ export async function getRecentCriticalCves(days: number = 3): Promise<Vuln[]> {
 }
 
 async function getRecentCriticalCvesFetched(days: number = 3): Promise<Fetched<Vuln[]>> {
-  "use cache";
+  "use cache: remote";
   const result = await settle(async () => {
     const end = new Date();
     const start = new Date(end.getTime() - days * 86_400_000);
@@ -152,9 +161,7 @@ async function getRecentCriticalCvesFetched(days: number = 3): Promise<Fetched<V
       cvssV3Severity: "CRITICAL",
       resultsPerPage: "200",
     }).toString();
-    const headers: Record<string, string> = { "User-Agent": UA };
-    if (process.env.NVD_API_KEY) headers.apiKey = process.env.NVD_API_KEY;
-    const res = await fetch(url, { headers, signal: AbortSignal.timeout(25_000) });
+    const res = await nvdFetch(url);
     if (!res.ok) throw new Error(`NVD ${res.status}`);
     const json = (await res.json()) as { vulnerabilities: NvdCve[] };
     return json.vulnerabilities.map(({ cve }) => {
@@ -241,12 +248,7 @@ function cveRecordToVuln(record: CveRecord): Vuln {
 }
 
 async function nvdLookup(cveId: string): Promise<Vuln | null> {
-  const headers: Record<string, string> = { "User-Agent": UA };
-  if (process.env.NVD_API_KEY) headers.apiKey = process.env.NVD_API_KEY;
-  const res = await fetch(`https://services.nvd.nist.gov/rest/json/cves/2.0?cveId=${encodeURIComponent(cveId)}`, {
-    headers,
-    signal: AbortSignal.timeout(15_000),
-  });
+  const res = await nvdFetch(`https://services.nvd.nist.gov/rest/json/cves/2.0?cveId=${encodeURIComponent(cveId)}`);
   if (!res.ok) throw new Error(`NVD ${res.status}`);
   const json = (await res.json()) as { vulnerabilities: NvdCve[] };
   const cve = json.vulnerabilities[0]?.cve;
@@ -309,12 +311,15 @@ export async function getLatestCriticalCves(): Promise<Vuln[]> {
 }
 
 async function getLatestCriticalCvesFetched(): Promise<Fetched<Vuln[]>> {
-  "use cache";
+  "use cache: remote";
   const result = await settle(async () => {
     return withLastGood("circl-latest", async () => {
       const page = async (n: number) => {
         const url = `https://vulnerability.circl.lu/api/vulnerability/?source=cvelistv5&date_sort=published&sort_order=desc&per_page=100&page=${n}`;
-        const res = await fetch(url, { headers: { "User-Agent": UA, Accept: "application/json" }, signal: AbortSignal.timeout(15_000) });
+        const res = await fetch(url, {
+          headers: { "User-Agent": UA, Accept: "application/json", ...(process.env.CIRCL_API_KEY ? { "X-API-KEY": process.env.CIRCL_API_KEY } : {}) },
+          signal: AbortSignal.timeout(15_000),
+        });
         if (!res.ok) throw new Error(`CIRCL ${res.status}`);
         return (await res.json()) as CveRecord[];
       };
@@ -352,6 +357,8 @@ async function ghsa(params: Record<string, string>): Promise<GhsaAdvisory[]> {
     "X-GitHub-Api-Version": "2022-11-28",
   };
   if (process.env.GITHUB_TOKEN) headers.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`;
+  const quota = await takeLimits([{ key: "upstream:github", limit: process.env.GITHUB_TOKEN ? 4500 : 50, windowMs: 3_600_000 }]);
+  if (!quota.allowed) throw new Error("GitHub request budget unavailable");
   const res = await fetch(`https://api.github.com/advisories?${new URLSearchParams(params)}`, {
     headers,
     signal: AbortSignal.timeout(15_000),
@@ -366,7 +373,7 @@ export async function getMalwarePackages(): Promise<MalwarePackage[]> {
 }
 
 async function getMalwarePackagesFetched(): Promise<Fetched<MalwarePackage[]>> {
-  "use cache";
+  "use cache: remote";
   const result = await settle(async () => {
     const advisories = await withLastGood("ghsa-malware", () => ghsa({ type: "malware", per_page: "60", sort: "published", direction: "desc" }));
     return advisories.map((a) => ({
@@ -389,7 +396,7 @@ export async function getCriticalAdvisories(): Promise<Vuln[]> {
 }
 
 async function getCriticalAdvisoriesFetched(): Promise<Fetched<Vuln[]>> {
-  "use cache";
+  "use cache: remote";
   const result = await settle(async () => {
     const advisories = await withLastGood("ghsa-critical", () =>
       ghsa({ type: "reviewed", severity: "critical", per_page: "40", sort: "published", direction: "desc" }),
@@ -441,9 +448,10 @@ async function getCveNewsMentionsFetched(): Promise<Fetched<Record<string, numbe
       const start = new Date(end.getTime() - 7 * 86_400_000);
       const day = (d: Date) => d.toISOString().slice(0, 10);
       const results = await Promise.allSettled(
-        CVE_NEWS_QUERIES.map((query) =>
-          valyu.search(query, { searchType: "news", maxNumResults: 20, startDate: day(start), endDate: day(end), responseLength: "medium" }),
-        ),
+        CVE_NEWS_QUERIES.map(async (query) => {
+          await reserveSharedWork("search");
+          return valyu.search(query, { searchType: "news", maxNumResults: 20, startDate: day(start), endDate: day(end), responseLength: "medium" });
+        }),
       );
       if (!results.some((result) => result.status === "fulfilled" && result.value.success)) throw new Error("Valyu CVE news search failed");
       const perCve = new Map<string, Set<string>>();

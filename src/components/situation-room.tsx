@@ -117,6 +117,8 @@ function DeepLinks() {
 export function SituationRoom({ snapshot }: { snapshot: Snapshot }) {
   const router = useRouter();
   const omnibox = useRef<OmniboxHandle>(null);
+  const topBar = useRef<HTMLDivElement>(null);
+  const [navHeight, setNavHeight] = useState(112);
   const mobile = useIsMobile();
   const mapReady = useIdle();
   const [hovered, setHovered] = useState<{ incident: Incident; x: number; y: number } | null>(null);
@@ -148,6 +150,16 @@ export function SituationRoom({ snapshot }: { snapshot: Snapshot }) {
     update();
     window.addEventListener("resize", update);
     return () => window.removeEventListener("resize", update);
+  }, []);
+
+  useEffect(() => {
+    const element = topBar.current;
+    if (!element) return;
+    const update = () => setNavHeight(element.getBoundingClientRect().height);
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(element);
+    return () => observer.disconnect();
   }, []);
 
   const filtered = useMemo(
@@ -257,16 +269,25 @@ export function SituationRoom({ snapshot }: { snapshot: Snapshot }) {
   const tagBottom = patchDockFits ? (patchDockOpen ? DOCK : 72) : 16;
   // Space the panels cover, so the globe is framed in what is left (below the 68px nav).
   const padding = mobile
-    ? { left: 0, right: 0, top: 112, bottom: panelOpen || sidebarOpen ? Math.round(viewport.h * (panelOpen || sheetOpen ? 0.8 : 0.52)) : 0 }
+    ? {
+        left: 0,
+        right: 0,
+        top: navHeight,
+        bottom:
+          panelOpen || sidebarOpen ? Math.max(0, Math.min(viewport.h - navHeight - 8, Math.round(viewport.h * (panelOpen || sheetOpen ? 0.8 : 0.52)))) : 0,
+      }
     : {
         left: cinema ? 0 : sidebarInset,
         right: panelOpen && !cinema ? Math.min(PANEL, Math.max(0, viewport.w - sidebarInset - 160)) : 0,
-        top: cinema ? 0 : 68,
+        top: cinema ? 0 : navHeight,
         bottom: cinema ? 0 : 96,
       };
 
   return (
-    <main className="relative h-dvh w-full overflow-hidden bg-space" style={{ "--map-inset-left": `${sidebarInset}px` } as React.CSSProperties}>
+    <main
+      className="relative h-dvh w-full overflow-hidden bg-space"
+      style={{ "--map-inset-left": `${sidebarInset}px`, "--map-top": `${navHeight + 8}px` } as React.CSSProperties}
+    >
       <Suspense fallback={null}>
         <DeepLinks />
       </Suspense>
@@ -282,7 +303,7 @@ export function SituationRoom({ snapshot }: { snapshot: Snapshot }) {
       ) : null}
 
       <div className={cn("pointer-events-none transition-opacity duration-500", cinema && "opacity-0")}>
-        <div className="absolute inset-x-0 top-0 z-30">
+        <div ref={topBar} className="absolute inset-x-0 top-0 z-30">
           <TopBar ticker={<CveTicker items={snapshot.fresh} generatedAt={snapshot.generatedAt} onSelect={selectCve} />} />
         </div>
 

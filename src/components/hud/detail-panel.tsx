@@ -40,7 +40,7 @@ function Shell({ children, onClose, label }: { children: React.ReactNode; onClos
   return (
     <aside
       aria-label={label}
-      className="drawer-surface pointer-events-auto absolute inset-x-0 bottom-0 top-[22vh] z-30 flex flex-col overflow-hidden rounded-t-[24px] animate-in fade-in slide-in-from-bottom-6 duration-300 md:inset-x-auto md:bottom-4 md:right-4 md:top-[76px] md:w-[440px] md:rounded-[22px] md:slide-in-from-bottom-0 md:slide-in-from-right-6"
+      className="drawer-surface pointer-events-auto absolute inset-x-0 bottom-0 top-[max(22dvh,var(--map-top))] z-30 flex flex-col overflow-hidden rounded-t-[24px] pb-[env(safe-area-inset-bottom)] animate-in fade-in slide-in-from-bottom-6 duration-300 md:inset-x-auto md:bottom-4 md:right-4 md:top-[var(--map-top)] md:w-[440px] md:rounded-[22px] md:pb-0 md:slide-in-from-bottom-0 md:slide-in-from-right-6"
     >
       <button
         type="button"
@@ -59,7 +59,7 @@ function Section({ title, aside, children, className }: { title?: string; aside?
   return (
     <section className={cn("border-t border-white/[0.06] px-6 py-5", className)}>
       {title ? (
-        <div className="mb-3.5 flex min-h-7 items-center justify-between gap-3">
+        <div className="mb-3.5 flex min-h-7 flex-wrap items-center justify-between gap-3">
           <h3 className="font-mono text-[10.5px] uppercase tracking-[0.08em] text-ink-3">{title}</h3>
           {aside}
         </div>

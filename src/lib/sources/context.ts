@@ -1,4 +1,5 @@
 import "server-only";
+import { reserveSharedWork } from "@/lib/http/paid-budget";
 
 import { type Fetched, settle, unwrap } from "@/lib/fetched";
 
@@ -26,7 +27,7 @@ export async function getOutages(): Promise<Outage[]> {
 }
 
 async function getOutagesFetched(): Promise<Fetched<Outage[]>> {
-  "use cache";
+  "use cache: remote";
   const result = await settle(async () => {
     return withLastGood("ioda", async () => {
       const until = Math.floor(Date.now() / 1000);
@@ -127,7 +128,7 @@ export async function getLatestBrief(): Promise<DailyBrief | null> {
 }
 
 async function getLatestBriefFetched(): Promise<Fetched<DailyBrief | null>> {
-  "use cache";
+  "use cache: remote";
   const result = await settle(async () => {
     const valyu = valyuServer();
     if (!valyu) return null;
@@ -147,6 +148,7 @@ export async function startBrief(): Promise<string | null> {
   const now = new Date();
   const start = new Date(now.getTime() - 2 * 86_400_000);
   const day = (d: Date) => d.toISOString().slice(0, 10);
+  await reserveSharedWork("research");
   const res = await valyu.deepresearch.create({
     query: briefQuery(day(now)),
     mode: "standard",

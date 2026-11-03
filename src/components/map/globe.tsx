@@ -537,7 +537,7 @@ export function Globe({ incidents, outages, countryCounts, padding, onHover, onC
     if (credits) {
       const mobile = window.matchMedia("(max-width: 767px)").matches;
       credits.style.left = `${mobile ? 0 : Math.max(0, padding.left - 8)}px`;
-      credits.style.top = `${mobile ? 112 : padding.left ? 66 : 116}px`;
+      credits.style.top = `${mobile ? padding.top : padding.left ? padding.top - 2 : padding.top + 48}px`;
     }
     const state = useSituation.getState();
     const hero = !state.selectedId && !state.selectedCve && !state.cinema && !userZoomedRef.current;

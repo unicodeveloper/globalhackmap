@@ -1,4 +1,5 @@
 import "server-only";
+import { reserveSharedWork } from "@/lib/http/paid-budget";
 
 import { type Fetched, beforeDeadline, settle, unwrap } from "@/lib/fetched";
 
@@ -105,7 +106,7 @@ export async function getRansomwareClaims(): Promise<Candidate[]> {
 }
 
 async function getRansomwareClaimsFetched(): Promise<Fetched<Candidate[]>> {
-  "use cache";
+  "use cache: remote";
   const result = await settle(async () => {
     const res = await fetch("https://www.ransomlook.io/api/recent", {
       headers: { "User-Agent": UA },
@@ -180,7 +181,7 @@ export async function getSecDisclosures(): Promise<Candidate[]> {
 }
 
 async function getSecDisclosuresFetched(): Promise<Fetched<Candidate[]>> {
-  "use cache";
+  "use cache: remote";
   const result = await settle(async () => {
     const end = new Date();
     const start = new Date(end.getTime() - 30 * 86_400_000);
@@ -293,15 +294,16 @@ async function discoverNewsFetched(): Promise<Fetched<Discovered[]>> {
       const start = new Date(end.getTime() - 7 * 86_400_000);
       const day = (d: Date) => d.toISOString().slice(0, 10);
       const results = await Promise.allSettled(
-        NEWS_QUERIES.map((query) =>
-          valyu.search(query, {
+        NEWS_QUERIES.map(async (query) => {
+          await reserveSharedWork("search");
+          return valyu.search(query, {
             searchType: "news",
             maxNumResults: 10,
             startDate: day(start),
             endDate: day(end),
             responseLength: "short",
-          }),
-        ),
+          });
+        }),
       );
       // Every query failing is an outage, not a quiet news week: throw so the feed shows as down.
       if (!results.some((result) => result.status === "fulfilled" && result.value.success)) throw new Error("Valyu news search failed");
@@ -380,6 +382,7 @@ export async function extractArticle(url: string, version: number): Promise<Extr
 async function requestExtraction(url: string): Promise<Extraction> {
   const valyu = valyuServer();
   if (!valyu) throw new Error("no Valyu key");
+  await reserveSharedWork("contents");
   const res = await valyu.contents([url], { summary: ARTICLE_SCHEMA, responseLength: "medium" });
   const first = "results" in res ? res.results?.[0] : undefined;
   if (!first || first.status !== "success") throw new Error(`extraction failed for ${url}`);
@@ -540,7 +543,7 @@ export async function getSweepIncidents(): Promise<Candidate[]> {
 }
 
 async function getSweepIncidentsFetched(): Promise<Fetched<Candidate[]>> {
-  "use cache";
+  "use cache: remote";
   const result = await settle(async () => {
     return withLastGood("valyu-sweeps", async () => {
       const valyu = valyuServer();
@@ -579,6 +582,7 @@ export async function startSweep(fromDaysAgo = 3, toDaysAgo = 0): Promise<string
   const end = new Date(Date.now() - toDaysAgo * 86_400_000);
   const start = new Date(Date.now() - fromDaysAgo * 86_400_000);
   const day = (d: Date) => d.toISOString().slice(0, 10);
+  await reserveSharedWork("research");
   const res = await valyu.deepresearch.create({
     query: sweepQuery(day(start), day(end), end.toISOString().slice(0, 13) + ":00Z"),
     mode: "fast",
