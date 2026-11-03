@@ -3,6 +3,7 @@ import "server-only";
 import { cacheLife, cacheTag } from "next/cache";
 
 import { beforeDeadline } from "@/lib/fetched";
+import { reserveSharedWork } from "@/lib/http/paid-budget";
 import { findVuln } from "@/lib/lookup";
 import { productLabel } from "@/lib/og/copy";
 import { getSnapshot } from "@/lib/snapshot";
@@ -48,6 +49,7 @@ async function requestExplainer(cve: string): Promise<Explainer> {
   if (!vuln?.vendor) throw new Error(`no vendor record for ${cve}`);
   const valyu = valyuServer();
   if (!valyu) throw new Error("no Valyu key");
+  await reserveSharedWork("answer");
   const res = await valyu.answer(
     `${vuln.cve} (${tidy(vuln.vendor)} ${tidy(vuln.product)}): ${vuln.name.trim()}. In plain English for a non-specialist: what can an attacker do, who is affected, and what is the fix (fixed version or mitigation)? Use the vendor advisory.`,
     {

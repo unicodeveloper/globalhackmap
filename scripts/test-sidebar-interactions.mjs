@@ -45,7 +45,8 @@ const state = () =>
     dockDisplay: getComputedStyle(dock).display,
     cursor: document.body.style.cursor,
     tabsOverflow: document.querySelector('[aria-label="Live lists"]').scrollWidth > document.querySelector('[aria-label="Live lists"]').clientWidth,
-    creditsLeft: parseFloat(getComputedStyle(document.querySelector('.mapboxgl-ctrl-top-left')).left)
+    creditsLeft: parseFloat(getComputedStyle(document.querySelector('.mapboxgl-ctrl-top-left')).left),
+    navBottom: document.querySelector('header').getBoundingClientRect().bottom
   };
 })()`);
 
@@ -153,8 +154,8 @@ try {
   assert.ok(Math.abs(s.height - 844 * 0.52) < 2);
   assert.equal(s.overflow, false);
   click("Expand the panel");
-  wait("document.querySelector('#map-sidebar').clientHeight > 740");
-  assert.ok(Math.abs(state().height - 844 * 0.88) < 2);
+  wait("document.querySelector('#map-sidebar').clientHeight > 700");
+  assert.ok(Math.abs(state().height - Math.min(844 * 0.88, 844 - state().navBottom - 8)) < 2);
   click("Close sidebar");
   wait("window.__map.getPadding().bottom === 0");
   s = state();
@@ -163,10 +164,10 @@ try {
   checkMap(s, 0);
   click("Show sidebar");
   assert.equal(state().focus, "Close sidebar");
-  assert.ok(Math.abs(state().height - 844 * 0.88) < 2);
+  assert.ok(Math.abs(state().height - Math.min(844 * 0.88, 844 - state().navBottom - 8)) < 2);
   click("Show more of the map");
   wait("document.querySelector('#map-sidebar').clientHeight < 440");
-  console.log("PASS mobile 390x844: full-width sheet, 52%/88% heights, no resize handle, close/reopen unobstructed");
+  console.log("PASS mobile 390x844: full-width sheet, expanded height stays below navigation, no resize handle, close/reopen unobstructed");
   browser("set", "viewport", "1440", "1000");
   browser("screenshot");
   wait("window.__map.getPadding().left === 1120");

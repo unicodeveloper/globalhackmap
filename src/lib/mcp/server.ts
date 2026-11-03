@@ -25,6 +25,7 @@ function result(summary: string, data: unknown, isError = false) {
       { type: "text" as const, text: summary },
       { type: "text" as const, text: JSON.stringify(data) },
     ],
+    structuredContent: { data },
     ...(isError ? { isError: true } : {}),
   };
 }
@@ -107,7 +108,7 @@ export const mcpHandler = createMcpHandler(
             .toUpperCase()
             .refine((value) => /^[A-Z]{2}$/.test(value) && Object.hasOwn(countries, value), "Use an ISO2 country code.")
             .optional(),
-          status: z.enum(["confirmed", "reported", "claimed"]).optional(),
+          status: z.enum(["confirmed", "reported", "claimed", "precautionary", "disputed"]).optional(),
           since_days: z.number().int().min(1).max(30).default(7),
           limit: z.number().int().min(1).max(50).default(20),
         }),

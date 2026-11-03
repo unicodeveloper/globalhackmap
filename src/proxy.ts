@@ -1,6 +1,9 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 import countries from "@/data/geo/countries.json";
+import { clientIp, limitResponse, takeLimits } from "@/lib/http/rate-limit";
+import { requestLimits } from "@/lib/http/request-limits";
+import { isAuthorizedCron } from "@/lib/http/cron";
 
 const CVE_ID = /^CVE-\d{4}-\d{4,7}$/i;
 
@@ -23,12 +26,19 @@ function canonical(request: NextRequest, segments: string[]) {
  * Pages stream their shell before the lookup inside can call notFound(), so a bad id would otherwise
  * answer 200. IDs that cannot exist (not a CVE ID, not a country code) are turned away here instead.
  */
-export function proxy(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   let path: string;
   try {
     path = decodeURIComponent(request.nextUrl.pathname);
   } catch {
     return new NextResponse("Bad request: the URL has a malformed escape sequence.", { status: 400 });
+  }
+  // Authenticated scheduled jobs must keep working during a limiter outage.
+  const scheduled = path.startsWith("/api/cron/") && isAuthorizedCron(request);
+  const lookup = /^\/(?:cve|fix|incident|country)\/[^/]+/.test(path);
+  if ((path.startsWith("/api/") && !scheduled) || lookup) {
+    const response = limitResponse(await takeLimits(requestLimits(path, request.method, clientIp(request))));
+    if (response) return response;
   }
   const [, section, id, ...rest] = path.split("/");
   if (!id) return NextResponse.next();
@@ -45,5 +55,5 @@ export function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/cve/:path*", "/incident/:path*", "/country/:path*", "/fix/:path*", "/api/explain/:path*"],
+  matcher: ["/cve/:path*", "/incident/:path*", "/country/:path*", "/fix/:path*", "/api/:path*"],
 };

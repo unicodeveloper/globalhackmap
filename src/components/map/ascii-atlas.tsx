@@ -116,13 +116,17 @@ function glyphAtlas(dpr: number): HTMLCanvasElement {
 }
 
 export function AsciiAtlas() {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const map = useMapInstance((s) => s.map);
   const ready = useMapInstance((s) => s.ready);
 
   useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas || !map || !ready) return;
+    const container = containerRef.current;
+    if (!container || !map || !ready) return;
+    // Activity preserves React's DOM on navigation. Own a fresh canvas for each effect so a
+    // context released during cleanup is never reused when the route becomes visible again.
+    const canvas = document.createElement("canvas");
+    canvas.className = "absolute inset-0 h-full w-full";
     const gl = canvas.getContext("webgl2", { premultipliedAlpha: true, antialias: false, alpha: true });
     if (!gl) return;
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches || new URLSearchParams(window.location.search).has("still");
@@ -136,6 +140,7 @@ export function AsciiAtlas() {
       if (!gl.getProgramParameter(program, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(program) ?? "link");
     } catch (error) {
       console.warn("Atlas shader unavailable", error);
+      gl.getExtension("WEBGL_lose_context")?.loseContext();
       return;
     }
     gl.useProgram(program);
@@ -176,6 +181,7 @@ export function AsciiAtlas() {
     };
 
     let dpr = Math.min(window.devicePixelRatio || 1, 2);
+    let disposed = false;
     let imageReady = false;
     const image = new Image();
     image.decoding = "async";
@@ -184,7 +190,9 @@ export function AsciiAtlas() {
       texture(0, image, gl.LINEAR);
       imageReady = true;
     };
-    void document.fonts.ready.then(() => texture(1, glyphAtlas(dpr), gl.NEAREST));
+    void document.fonts.ready.then(() => {
+      if (!disposed) texture(1, glyphAtlas(dpr), gl.NEAREST);
+    });
     texture(1, glyphAtlas(dpr), gl.NEAREST);
 
     gl.enable(gl.BLEND);
@@ -198,6 +206,7 @@ export function AsciiAtlas() {
     };
     window.addEventListener("pointermove", onMove, { passive: true });
 
+    container.appendChild(canvas);
     const resize = () => {
       dpr = Math.min(window.devicePixelRatio || 1, 2);
       canvas.width = Math.round(canvas.clientWidth * dpr);
@@ -249,12 +258,15 @@ export function AsciiAtlas() {
     frame = requestAnimationFrame(draw);
 
     return () => {
+      disposed = true;
+      image.onload = null;
       cancelAnimationFrame(frame);
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("resize", resize);
+      canvas.remove();
       gl.getExtension("WEBGL_lose_context")?.loseContext();
     };
   }, [map, ready]);
 
-  return <canvas ref={canvasRef} className="pointer-events-none absolute inset-0 z-[5] h-full w-full" aria-hidden />;
+  return <div ref={containerRef} className="pointer-events-none absolute inset-0 z-[5] h-full w-full" aria-hidden />;
 }

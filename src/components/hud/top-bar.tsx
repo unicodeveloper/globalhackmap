@@ -26,13 +26,21 @@ function NavLinks({ pathname }: { pathname: string | null }) {
       <Link
         key={item.href}
         href={item.href}
+        aria-label={item.href === "/check" ? item.label : undefined}
         className={cn(
-          "press h-8 items-center whitespace-nowrap rounded-full px-3.5 text-[13px] transition-colors",
+          "press h-8 items-center whitespace-nowrap rounded-full px-2.5 text-[13px] transition-colors md:px-3.5",
           item.show,
           active ? "bg-white/[0.09] text-ink" : "text-ink-2 hover:text-ink",
         )}
       >
-        {item.label}
+        {item.href === "/check" ? (
+          <>
+            <span className="min-[390px]:hidden">Check</span>
+            <span className="hidden min-[390px]:inline">{item.label}</span>
+          </>
+        ) : (
+          item.label
+        )}
       </Link>
     );
   });
@@ -48,7 +56,7 @@ function ActiveNavLinks() {
  */
 export function TopBar({ ticker }: { ticker?: React.ReactNode }) {
   return (
-    <header className="pointer-events-auto flex min-h-[68px] flex-wrap items-center gap-x-2 bg-space px-4 sm:gap-x-4 py-3.5 sm:px-5">
+    <header className="pointer-events-auto flex min-h-[68px] flex-wrap items-center gap-x-2 bg-space pb-3.5 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] pt-[max(0.875rem,env(safe-area-inset-top))] sm:gap-x-4 sm:pl-[max(1.25rem,env(safe-area-inset-left))] sm:pr-[max(1.25rem,env(safe-area-inset-right))]">
       <Link href="/" className="flex items-center gap-2.5 rounded-full py-1.5 pl-1 pr-2 sm:pr-3" aria-label="Global Hack Map home">
         <BrandMark className="size-[22px] text-ink" />
         {/* Stacked on phones so the nav keeps its row; one line from small tablets up. */}

@@ -3,6 +3,7 @@
 import { Dialog } from "@base-ui/react/dialog";
 import { Check, X } from "@phosphor-icons/react";
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
 
 import { ValyuMark } from "@/components/icons/agents";
 import { startSignIn, useAuth } from "@/lib/auth/client";
@@ -47,6 +48,13 @@ export function SignInPrompt() {
     void useAccess.persist.rehydrate();
   }, []);
 
+  // Back can restore the entire document from the browser cache, including pending UI state.
+  useEffect(() => {
+    const onPageShow = () => setLeaving(false);
+    window.addEventListener("pageshow", onPageShow);
+    return () => window.removeEventListener("pageshow", onPageShow);
+  }, []);
+
   // Signing in elsewhere (another tab, the nav button) closes it.
   useEffect(() => {
     if (user && prompt) closePrompt();
@@ -55,10 +63,10 @@ export function SignInPrompt() {
   const copy = COPY[reason];
 
   return (
-    <Dialog.Root open={Boolean(prompt)} onOpenChange={(open) => !open && !leaving && closePrompt()}>
+    <Dialog.Root open={Boolean(prompt)} onOpenChange={(open) => !open && closePrompt()}>
       <Dialog.Portal>
         <Dialog.Backdrop className="fixed inset-0 z-[60] bg-black/70 transition-opacity duration-200 data-[ending-style]:opacity-0 data-[starting-style]:opacity-0" />
-        <Dialog.Popup className="fixed left-1/2 top-1/2 z-[61] w-[min(440px,calc(100%-2rem))] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-[22px] bg-surface text-ink ring-1 ring-hairline-2 shadow-xl outline-none transition-[opacity,transform] duration-200 ease-out-expo data-[ending-style]:scale-[0.97] data-[ending-style]:opacity-0 data-[starting-style]:scale-[0.97] data-[starting-style]:opacity-0">
+        <Dialog.Popup className="fixed left-1/2 top-1/2 z-[61] max-h-[calc(100dvh-2rem)] w-[min(440px,calc(100%-2rem))] -translate-x-1/2 -translate-y-1/2 overflow-y-auto overscroll-contain rounded-[22px] bg-surface text-ink ring-1 ring-hairline-2 shadow-xl outline-none transition-[opacity,transform] duration-200 ease-out-expo data-[ending-style]:scale-[0.97] data-[ending-style]:opacity-0 data-[starting-style]:scale-[0.97] data-[starting-style]:opacity-0">
           <div className="relative px-6 pb-6 pt-7">
             <Dialog.Close
               className="press absolute right-3 top-3 flex size-8 items-center justify-center rounded-full text-ink-3 transition-colors hover:bg-white/[0.06] hover:text-ink"
@@ -82,9 +90,15 @@ export function SignInPrompt() {
             <button
               type="button"
               disabled={leaving}
-              onClick={() => {
+              onClick={async () => {
                 setLeaving(true);
-                void startSignIn();
+                try {
+                  await startSignIn();
+                } catch {
+                  toast.error("Could not open sign-in. Please try again.");
+                } finally {
+                  setLeaving(false);
+                }
               }}
               className="press mt-6 flex h-12 w-full items-center justify-center gap-2.5 rounded-full bg-ink text-[15px] font-semibold text-space transition-colors hover:bg-white disabled:opacity-70"
             >

@@ -158,6 +158,21 @@ export default async function AgentsPage() {
                 For stack checks, remove credentials, private registry URLs and other sensitive information before sharing input. No result is a guarantee that
                 your stack is safe.
               </p>
+              <div className={cn(TILE, "mt-4 space-y-2 px-5 py-4 text-[13px] leading-relaxed text-ink-3")}>
+                <h3 className="font-medium text-ink-2">Limits and troubleshooting</h3>
+                <p>
+                  Use Streamable HTTP at the exact server URL above. Stack checks accept up to 500 KB and check at most 1,000 packages; read the coverage notes
+                  in each result.
+                </p>
+                <p>
+                  Requests are limited per IP. On HTTP 429, wait for the Retry-After interval before retrying. HTTP 503 means a service or request protection is
+                  temporarily unavailable.
+                </p>
+                <p>
+                  Confirmed, reported, claimed, precautionary and disputed are distinct statuses. An empty result means no matching record in the available
+                  data, not proof of safety.
+                </p>
+              </div>
             </section>
 
             <section id="runbooks" className="scroll-mt-8">

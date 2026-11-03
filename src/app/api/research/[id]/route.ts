@@ -42,12 +42,12 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
         output: task.status === "completed" ? task.output : undefined,
         pdfUrl: task.status === "completed" ? task.pdf_url : undefined,
         sources: task.status === "completed" ? (task.sources ?? []).filter((s) => s.url).slice(0, 12) : undefined,
-        error: task.error,
+        error: task.error ? "Research did not finish. Please try again shortly." : undefined,
       },
       { headers: { "Cache-Control": "no-store" } },
     );
-  } catch (error) {
-    console.error("[research status]", error instanceof Error ? error.message : error);
+  } catch {
+    console.error("[research status] Request failed");
     return NextResponse.json({ error: "Could not check progress just now." }, { status: 502 });
   }
 }

@@ -39,18 +39,44 @@ For the production build locally: `pnpm build && pnpm start`. The first build ru
 
 See [`.env.example`](.env.example). In short:
 
-| Variable                   | Needed for                                                                                                 |
-| -------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| `NEXT_PUBLIC_MAPBOX_TOKEN` | The globe (a public, URL-restricted Mapbox token)                                                          |
-| `VALYU_API_KEY`            | News extraction, the daily brief, AI answers, research reports and explainers                              |
-| `CRON_SECRET`              | Authenticating the scheduled sweep and brief routes                                                        |
-| `GITHUB_TOKEN`             | Higher rate limits for the GitHub Advisory Database                                                        |
-| `NVD_API_KEY`              | Recommended: without it NVD allows 5 requests per 30s and the new-CVE feed falls back to CVE.org and CIRCL |
-| `NEXT_PUBLIC_SITE_URL`     | Absolute links in share cards and runbooks                                                                 |
+| Variable                                                                         | Needed for                                                                                                                                                 |
+| -------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `NEXT_PUBLIC_MAPBOX_TOKEN`                                                       | The globe (a public, URL-restricted Mapbox token)                                                                                                          |
+| `VALYU_API_KEY`                                                                  | News extraction, the daily brief, generated answers, research reports and explainers                                                                       |
+| `CRON_SECRET`                                                                    | Authenticating the scheduled sweep and brief routes                                                                                                        |
+| `GITHUB_TOKEN`                                                                   | Higher rate limits for the GitHub Advisory Database                                                                                                        |
+| `NVD_API_KEY`                                                                    | Recommended: without it NVD allows 5 requests per 30s and the new-CVE feed falls back to CVE.org and CIRCL                                                 |
+| `CIRCL_API_KEY`                                                                  | Optional: CIRCL advertises 40 requests/minute with a key versus 20/minute anonymously                                                                      |
+| `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`                             | Required in production: shared request limits and shared-key operation budgets                                                                             |
+| `NEXT_PUBLIC_SITE_URL`                                                           | Absolute links in share cards and runbooks                                                                                                                 |
+| `NEXT_PUBLIC_APP_MODE`                                                           | Optional build-time switch: `valyu` enables account mode; unset defaults to self-hosted mode                                                               |
+| `NEXT_PUBLIC_VALYU_CLIENT_ID`, `NEXT_PUBLIC_REDIRECT_URI`, `VALYU_CLIENT_SECRET` | OAuth client settings for optional account mode; not needed for default self-hosting                                                                       |
+| `NEXT_PUBLIC_VALYU_AUTH_URL`, `VALYU_APP_URL`                                    | Optional auth and account-platform URL overrides; default to Valyu's hosted services                                                                       |
+| `SESSION_SECRET`                                                                 | Signs the anonymous brief quota cookie in account mode; falls back to `CRON_SECRET`. Production anonymous briefs in that mode require one of these secrets |
+
+Account mode uses signed-in visitors' Valyu credits for their answers and research; shared news and anonymous answers still use the deployment key. The additional account settings above are read by the source but are not included in `.env.example`.
 
 ## Deploy
 
-Built for Vercel: `vercel.json` schedules the news sweep every six hours and the daily brief each morning. Set the environment variables above in the project settings.
+For Vercel, set the environment variables in project settings. [`vercel.json`](vercel.json) schedules the news sweep at minute 5 every six hours and the daily brief at 05:30 UTC. Set `CRON_SECRET` to authenticate those routes. Other hosts need an equivalent scheduler if those jobs are wanted.
+
+[`next.config.ts`](next.config.ts) enables Cache Components and Partial Prefetching, with per-function cache lifetimes. Paid and rate-limited functions use `use cache: remote`. No custom remote cache handler is configured here: when self-hosting outside a platform that supplies remote caching, configure a compatible remote cache handler before relying on shared caching across instances.
+
+Production request limits use the official `@upstash/redis` and `@upstash/ratelimit` libraries. Configure the two Redis variables before deploying: protected APIs and dynamic lookups return 503 if protection cannot be checked. Development has a bounded, process-local fallback. Add Vercel Firewall rules to reject abuse before functions run. See [production protection and upstream API audit](docs/operations.md) for limits, external setup and the distinction between operation quotas and monetary spending limits.
+
+The Vercel integration's `KV_REST_API_URL` and `KV_REST_API_TOKEN` names are supported automatically, so no duplicate `UPSTASH_*` variables are needed when Vercel supplies that pair. If either explicit `UPSTASH_*` variable is set, complete that pair; credentials from the two naming schemes are never mixed. The read-only token and TCP `REDIS_URL`/`KV_URL` are not used by this HTTP-based limiter.
+
+The snapshot normally revalidates after 10 minutes and public feeds after 15 minutes. These are cache policies, not publication-to-screen guarantees. Upstream delays, timeouts, cached results and fallback data can make the view older or incomplete; check timestamps and original sources.
+
+## Development checks
+
+```bash
+pnpm exec tsc --noEmit
+pnpm exec eslint src
+pnpm exec vitest run
+```
+
+Browser regressions against `pnpm dev`: `node scripts/test-navigation-interactions.mjs`, `node scripts/test-responsive-interactions.mjs`, `node scripts/test-sidebar-interactions.mjs` and `node scripts/test-mcp.mjs`. To verify concurrent counters against an isolated local Redis process, install `redis-server`/`redis-cli` and run `GHM_REDIS_INTEGRATION=1 pnpm exec vitest run src/lib/http/rate-limit.integration.test.ts`.
 
 ## How it works
 
