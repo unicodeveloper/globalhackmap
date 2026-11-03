@@ -14,12 +14,14 @@ describe("free allowance and sign-in", () => {
     useAuth.setState({ user: null, loaded: true });
   });
 
-  it("lets a signed-out visitor open a few dossiers a day, then asks them to sign in", () => {
+  it("allows two distinct dossiers per day and prompts before the third", () => {
     const { allowOpen } = useAccess.getState();
-    for (let i = 0; i < FREE_OPENS; i++) expect(allowOpen(`i:${i}`)).toBe(true);
+    expect(allowOpen("i:first")).toBe(true);
+    expect(allowOpen("cve:CVE-2021-44228")).toBe(true);
     expect(useAccess.getState().prompt).toBeNull();
-    expect(allowOpen("i:extra")).toBe(false);
+    expect(allowOpen("i:third")).toBe(false);
     expect(useAccess.getState().prompt).toBe("dossiers");
+    expect(useAccess.getState().opened).toHaveLength(2);
   });
 
   it("does not charge for reopening a dossier already opened today", () => {

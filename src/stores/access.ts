@@ -7,7 +7,7 @@ import { useAuth } from "@/lib/auth/client";
 import { ACCOUNTS } from "@/lib/mode";
 
 /** Dossiers a visitor can open each day before Global Hack Map asks them to sign in with Valyu. */
-export const FREE_OPENS = 3;
+export const FREE_OPENS = 2;
 
 /** Why the sign-in prompt is showing, so it can say what signing in unlocks. */
 export type PromptReason = "dossiers" | "answers" | "check" | "research";
