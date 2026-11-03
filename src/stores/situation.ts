@@ -4,6 +4,7 @@ import { create } from "zustand";
 
 import type { IncidentStatus, IncidentType } from "@/lib/types";
 import { useAccess } from "@/stores/access";
+import { INCIDENT_STATUSES } from "@/lib/incident-view";
 
 export type TimeWindow = "24h" | "7d" | "30d";
 export type RailTab = "incidents" | "exploited" | "malware" | "outages";
@@ -37,7 +38,7 @@ export const useSituation = create<SituationState>((set, get) => ({
   selectedCve: null,
   hoveredId: null,
   window: "7d",
-  statuses: new Set<IncidentStatus>(["confirmed", "reported", "claimed", "precautionary", "disputed"]),
+  statuses: new Set<IncidentStatus>(INCIDENT_STATUSES),
   types: null,
   country: null,
   // Vulnerabilities first: what to patch is the question most visitors arrive with.
@@ -61,7 +62,7 @@ export const useSituation = create<SituationState>((set, get) => ({
       const next = new Set(state.statuses);
       if (next.has(status)) next.delete(status);
       else next.add(status);
-      return { statuses: next.size ? next : state.statuses };
+      return { statuses: next };
     }),
   setCountry: (country) => set({ country }),
   setTab: (tab) => set({ tab }),

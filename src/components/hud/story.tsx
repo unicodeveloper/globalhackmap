@@ -15,7 +15,8 @@ import { Segmented } from "@/components/kit/segmented";
 import { StatusMark } from "@/components/kit/status-mark";
 import { countryName } from "@/lib/countries";
 import { STATUS_LABEL, epssPercent, relativeTime } from "@/lib/format";
-import type { Incident, IncidentStatus, MalwarePackage, Outage, Vuln } from "@/lib/types";
+import type { IncidentDay, IncidentSummary } from "@/lib/incident-view";
+import type { Incident, MalwarePackage, Outage, Vuln } from "@/lib/types";
 import { useNow } from "@/lib/perf/use-now";
 import { productLabel } from "@/lib/og/copy";
 import { cn } from "@/lib/utils";
@@ -30,6 +31,8 @@ const DAY = 86_400_000;
 interface StoryProps {
   incidents: Incident[];
   allIncidents: Incident[];
+  incidentSummary: IncidentSummary;
+  incidentDays: IncidentDay[];
   vulns: Vuln[];
   trending: Vuln[];
   kev: Vuln[];
@@ -49,7 +52,7 @@ function Eyebrow({ children, className }: { children: React.ReactNode; className
 
 /** The left column: the picture at a glance, the way in (search), then the live lists. */
 const StoryPanel = forwardRef<OmniboxHandle, StoryProps>(function Story(props, ref) {
-  const { incidents, allIncidents, vulns, trending, kev, fresh, malware, outages, generatedAt, onSearchFocus, onClose } = props;
+  const { incidents, allIncidents, incidentSummary, incidentDays, vulns, trending, kev, fresh, malware, outages, generatedAt, onSearchFocus, onClose } = props;
   // One clock for every "time ago" label: the snapshot time on the server and during hydration.
   const now = useNow(Date.parse(generatedAt));
   const [question, setQuestion] = useState<string | null>(null);
@@ -93,7 +96,7 @@ const StoryPanel = forwardRef<OmniboxHandle, StoryProps>(function Story(props, r
           </p>
         </div>
         <Header generatedAt={generatedAt} now={now} />
-        <Pulse incidents={incidents} allIncidents={allIncidents} generatedAt={generatedAt} />
+        <Pulse summary={incidentSummary} days={incidentDays} />
 
         <div className="mt-3">
           <Omnibox ref={ref} incidents={allIncidents} vulns={vulns} onAsk={setQuestion} onFocusChange={onSearchFocus} size="md" />
@@ -174,27 +177,38 @@ function Header({ generatedAt, now }: { generatedAt: string; now: number }) {
   );
 }
 
-/** The headline tile: how many organisations were hit, the daily rhythm, and the status split (which filters the map). */
-function Pulse({ incidents, allIncidents, generatedAt }: { incidents: Incident[]; allIncidents: Incident[]; generatedAt: string }) {
+/** Status counts describe the available scope, while the headline and bars follow visible results. */
+function Pulse({ summary, days }: { summary: IncidentSummary; days: IncidentDay[] }) {
   const window_ = useSituation((s) => s.window);
   const statuses = useSituation((s) => s.statuses);
   const toggleStatus = useSituation((s) => s.toggleStatus);
-
-  const counts = useMemo(() => {
-    const out = { confirmed: 0, reported: 0, claimed: 0 };
-    for (const incident of incidents) out[bucket(incident.status)] += 1;
-    return out;
-  }, [incidents]);
+  const setTab = useSituation((s) => s.setTab);
+  const counts = summary.statusCounts;
+  const toggle = (status: (typeof STATUSES)[number] | "precautionary" | "disputed") => {
+    toggleStatus(status);
+    setTab("incidents");
+  };
 
   return (
-    <div className="mt-3 overflow-hidden rounded-[18px] bg-surface-2">
+    <section aria-label="Organisation summary" className="mt-3 overflow-hidden rounded-[18px] bg-surface-2">
       <div className="flex items-center justify-between px-4 pt-3.5">
-        <Eyebrow>Organisations hit</Eyebrow>
+        <Eyebrow>{summary.filtered ? "Organisations shown" : "Organisations tracked"}</Eyebrow>
         <Eyebrow>{WINDOW_LABEL[window_]}</Eyebrow>
       </div>
       <div className="flex items-end justify-between gap-5 px-4 pb-4 pt-1.5">
-        <NumberFlow value={incidents.length} className="font-condensed text-[68px] font-bold leading-[0.86] tracking-[-0.035em] text-ink" willChange />
-        <DayBars incidents={allIncidents} generatedAt={generatedAt} windowDays={Math.round(WINDOW_MS[window_] / DAY)} />
+        <div className="min-w-0">
+          <NumberFlow
+            value={summary.organisations}
+            aria-label={`${summary.organisations} distinct organisations shown`}
+            className="font-condensed text-[68px] font-bold leading-[0.86] tracking-[-0.035em] text-ink"
+            willChange
+          />
+          <p className="mt-2 text-[11px] leading-snug text-ink-4">
+            {summary.filtered ? `of ${summary.availableOrganisations} tracked · ` : ""}
+            {summary.incidentCount} sourced {summary.incidentCount === 1 ? "incident" : "incidents"}
+          </p>
+        </div>
+        <DayBars days={days} windowDays={Math.round(WINDOW_MS[window_] / DAY)} />
       </div>
       <div className="grid grid-cols-3 border-t border-white/[0.06]">
         {STATUSES.map((status, index) => {
@@ -203,9 +217,9 @@ function Pulse({ incidents, allIncidents, generatedAt }: { incidents: Incident[]
             <button
               key={status}
               type="button"
-              onClick={() => toggleStatus(status)}
+              onClick={() => toggle(status)}
               aria-pressed={on}
-              title={`${on ? "Hide" : "Show"} ${STATUS_LABEL[status].toLowerCase()} incidents`}
+              title={`${on ? "Hide" : "Show"} ${counts[status]} ${STATUS_LABEL[status].toLowerCase()} ${counts[status] === 1 ? "organisation" : "organisations"}`}
               className={cn(
                 "px-4 py-3 text-left transition-[background-color,opacity] duration-200 hover:bg-white/[0.03]",
                 index > 0 && "border-l border-white/[0.06]",
@@ -216,43 +230,53 @@ function Pulse({ incidents, allIncidents, generatedAt }: { incidents: Incident[]
                 <StatusMark status={status} size={8} />
                 {STATUS_LABEL[status]}
               </span>
-              <span
-                className={cn(
-                  "mt-1 block text-[18px] font-semibold leading-none tracking-[-0.01em] tabular",
-                  on ? "text-ink" : "text-ink-3 line-through decoration-1",
-                )}
-              >
+              <span className={cn("mt-1 block text-[18px] font-semibold leading-none tracking-[-0.01em] tabular", on ? "text-ink" : "text-ink-4")}>
                 {counts[status]}
               </span>
             </button>
           );
         })}
       </div>
-    </div>
+      {(["precautionary", "disputed"] as const).some((status) => counts[status] > 0) ? (
+        <div className="flex flex-wrap gap-2 border-t border-white/[0.06] px-4 py-2">
+          {(["precautionary", "disputed"] as const)
+            .filter((status) => counts[status] > 0)
+            .map((status) => (
+              <button
+                key={status}
+                type="button"
+                aria-pressed={statuses.has(status)}
+                title={`${statuses.has(status) ? "Hide" : "Show"} ${counts[status]} ${STATUS_LABEL[status].toLowerCase()} ${counts[status] === 1 ? "organisation" : "organisations"}`}
+                onClick={() => toggle(status)}
+                className={cn(
+                  "press flex items-center gap-1.5 rounded-full px-2 py-1 text-[11px]",
+                  statuses.has(status) ? "bg-white/[0.06] text-ink-2" : "text-ink-4",
+                )}
+              >
+                <StatusMark status={status} size={7} />
+                {STATUS_LABEL[status]} {counts[status]}
+              </button>
+            ))}
+        </div>
+      ) : null}
+      <p className="border-t border-white/[0.06] px-4 py-2 text-[10.5px] leading-snug text-ink-4">
+        Toggle statuses to filter the map and breach list. Counts are distinct organisations; an organisation can appear under multiple statuses.
+      </p>
+    </section>
   );
 }
 
-function bucket(status: IncidentStatus): (typeof STATUSES)[number] {
-  if (status === "confirmed" || status === "claimed") return status;
-  return "reported";
-}
-
-/** Incidents first reported per day for 14 days. Days inside the selected window are bright, today brightest. */
-function DayBars({ incidents, generatedAt, windowDays }: { incidents: Incident[]; generatedAt: string; windowDays: number }) {
-  const days = useMemo(() => {
-    const base = Date.parse(generatedAt);
-    const bins = Array.from({ length: 14 }, (_, index) => ({ date: base - (13 - index) * DAY, total: 0 }));
-    for (const incident of incidents) {
-      const age = Math.floor((base - Date.parse(incident.date)) / DAY);
-      if (age >= 0 && age < 14) bins[13 - age].total += 1;
-    }
-    return bins;
-  }, [incidents, generatedAt]);
+/** Distinct organisations per rolling 24-hour period, using the same country and status filters. */
+function DayBars({ days, windowDays }: { days: IncidentDay[]; windowDays: number }) {
   const max = Math.max(1, ...days.map((day) => day.total));
   const HEIGHT = 46;
 
   return (
-    <div className="w-[168px] shrink-0" role="img" aria-label={`Incidents per day over the last 14 days: ${days.map((day) => day.total).join(", ")}`}>
+    <div
+      className="w-[min(40%,168px)] shrink-0"
+      role="img"
+      aria-label={`Organisations per 24-hour period over the last 14 days: ${days.map((day) => day.total).join(", ")}`}
+    >
       <div className="flex items-end gap-[4px]" style={{ height: HEIGHT }}>
         {days.map((day, index) => {
           const inWindow = index >= 14 - Math.min(14, windowDays);
@@ -260,7 +284,7 @@ function DayBars({ incidents, generatedAt, windowDays }: { incidents: Incident[]
           return (
             <span
               key={day.date}
-              title={`${label}: ${day.total} ${day.total === 1 ? "incident" : "incidents"}`}
+              title={`24 hours ending ${label}: ${day.total} ${day.total === 1 ? "organisation" : "organisations"}`}
               className={cn(
                 "flex-1 rounded-[2px] transition-[background-color,height] duration-500 ease-out-expo",
                 index === 13 ? "bg-ink" : inWindow ? "bg-white/45" : "bg-white/[0.13]",
@@ -272,7 +296,7 @@ function DayBars({ incidents, generatedAt, windowDays }: { incidents: Incident[]
       </div>
       <div className="mt-1.5 flex justify-between font-mono text-[10px] text-ink-4">
         <span>14d ago</span>
-        <span>today</span>
+        <span>last 24h</span>
       </div>
     </div>
   );

@@ -3,7 +3,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
 const exec = promisify(execFile);
@@ -13,6 +13,15 @@ describe.skipIf(process.env.GHM_REDIS_INTEGRATION !== "1")("official SDK against
   let process_: ChildProcess;
   let directory: string;
   let socket: string;
+  let now: number;
+
+  beforeEach(() => {
+    // Fixed windows use the SDK clock; keep subprocess latency from crossing a window mid-test.
+    now = 1_800_000_000_000;
+    vi.spyOn(Date, "now").mockImplementation(() => now);
+  });
+
+  afterEach(() => vi.restoreAllMocks());
 
   beforeAll(async () => {
     directory = await mkdtemp(join(tmpdir(), "ghm-limit-"));
@@ -66,13 +75,15 @@ describe.skipIf(process.env.GHM_REDIS_INTEGRATION !== "1")("official SDK against
     expect(await second.takeLimits([{ ...rule, key: "different-ip" }])).toEqual({ allowed: true });
   }, 15_000);
 
-  it("caps a shared budget across different identities and recovers after expiry", async () => {
+  it("caps a shared budget across identities and resets at the fixed-window boundary", async () => {
     const { takeLimits } = await import("./rate-limit");
     const budget = { key: "shared-budget", limit: 2, windowMs: 1000 };
     expect((await takeLimits([{ ...budget, key: "ip-a" }, budget])).allowed).toBe(true);
     expect((await takeLimits([{ ...budget, key: "ip-b" }, budget])).allowed).toBe(true);
     expect(await takeLimits([{ ...budget, key: "ip-c" }, budget])).toMatchObject({ allowed: false, unavailable: false });
-    await new Promise((resolve) => setTimeout(resolve, 1100));
+    now += 999;
+    expect(await takeLimits([budget])).toMatchObject({ allowed: false, unavailable: false });
+    now += 1;
     expect((await takeLimits([budget])).allowed).toBe(true);
   }, 10_000);
 });

@@ -18,6 +18,7 @@ import { TopBar } from "@/components/hud/top-bar";
 import { AsciiAtlas } from "@/components/map/ascii-atlas";
 import { DataTags } from "@/components/map/data-tags";
 import type { Incident, Snapshot, Vuln } from "@/lib/types";
+import { incidentView } from "@/lib/incident-view";
 import { cn } from "@/lib/utils";
 import { WINDOW_MS, useSituation } from "@/stores/situation";
 import { useStack } from "@/stores/stack";
@@ -162,13 +163,11 @@ export function SituationRoom({ snapshot }: { snapshot: Snapshot }) {
     return () => observer.disconnect();
   }, []);
 
-  const filtered = useMemo(
-    () =>
-      snapshot.incidents.filter(
-        (incident) => statuses.has(incident.status) && now - Date.parse(incident.date) <= WINDOW_MS[window_] && (!country || incident.country === country),
-      ),
+  const incidentData = useMemo(
+    () => incidentView(snapshot.incidents, { now, windowMs: WINDOW_MS[window_], country, statuses }),
     [snapshot.incidents, statuses, window_, now, country],
   );
+  const filtered = incidentData.incidents;
 
   const countryCounts = useMemo(() => {
     const counts: Record<string, number> = {};
@@ -321,6 +320,8 @@ export function SituationRoom({ snapshot }: { snapshot: Snapshot }) {
             ref={omnibox}
             incidents={filtered}
             allIncidents={snapshot.incidents}
+            incidentSummary={incidentData.summary}
+            incidentDays={incidentData.days}
             vulns={vulns}
             trending={snapshot.trending}
             kev={snapshot.kev}
